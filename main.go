@@ -23,11 +23,7 @@ func main() {
 
 			words := strings.SplitN(input, " ", 2)
 			command := words[0]
-			commandInput := ""
-			if len(words) > 1 {
-				commandInput = words[1]
-			}
-
+			fmt.Printf("\n")
 			switch command {
 
 			case "header":
@@ -37,8 +33,9 @@ func main() {
 				vm.PrintMemory(0, 8)
 
 			default:
-				fmt.Println("Unknown command:", command, commandInput)
+				fmt.Println("Unknown command:", command)
 			}
+			fmt.Printf("\n\n")
 		} else {
 			break
 		}
