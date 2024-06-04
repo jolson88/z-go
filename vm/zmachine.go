@@ -11,6 +11,13 @@ const KILOBYTES = 1024
 type VirtualMachine struct {
 	initialized bool
 	Memory      [512 * KILOBYTES]byte // The maximum size of any z-machine file
+
+	// Dictionary
+	dictEntryLength   byte
+	dictEntryCount    uint16
+	dictEntryStart    uint16
+	encodedTextLength byte
+	wordSeparators    []byte
 }
 
 func NewVirtualMachine(pathToStoryFile string) *VirtualMachine {
@@ -22,6 +29,17 @@ func NewVirtualMachine(pathToStoryFile string) *VirtualMachine {
 	}
 
 	copy(vm.Memory[:], data)
+
+	dictionaryAddress := vm.dictionaryLocation()
+	wordSeparatorCount := vm.Memory[dictionaryAddress]
+	for i := 0; i < int(wordSeparatorCount); i++ {
+		vm.wordSeparators = append(vm.wordSeparators, vm.Memory[dictionaryAddress+uint16(i)+1])
+	}
+	entryLengthLocation := dictionaryAddress + uint16(wordSeparatorCount) + 1
+	vm.dictEntryLength = vm.Memory[entryLengthLocation]
+	vm.dictEntryCount = vm.readWord(entryLengthLocation + 1)
+	vm.dictEntryStart = entryLengthLocation + 3
+	vm.encodedTextLength = 4
 
 	vm.initialized = true
 	return vm
@@ -120,5 +138,40 @@ func (vm *VirtualMachine) PrintHeader() {
 	fmt.Printf("Dictionary: 0x%04X\n", vm.dictionaryLocation())
 	fmt.Printf("Object Table: 0x%04X\n", vm.objectsLocation())
 	fmt.Printf("Globals: 0x%04X\n", vm.globalsLocation())
-	fmt.Printf("Abbreviation Table: 0x%04X", vm.abbreviationsLocation())
+	fmt.Printf("Abbreviation Table: 0x%04X\n", vm.abbreviationsLocation())
+}
+
+/*
+Dictionary
+*/
+func (vm *VirtualMachine) PrintDictionary() {
+	if !vm.initialized {
+		fmt.Println("VM not initialized")
+		return
+	}
+
+	fmt.Print("Word Separators: ")
+	for _, separator := range vm.wordSeparators {
+		fmt.Printf("%c ", separator)
+	}
+	fmt.Printf("\nEntry Length: %d\n", vm.dictEntryLength)
+	fmt.Printf("Entry Count: %d\n", vm.dictEntryCount)
+}
+
+func (vm *VirtualMachine) PrintDictionaryEntry(entryIndex uint16) {
+	if !vm.initialized {
+		fmt.Println("VM not initialized")
+		return
+	}
+	if entryIndex >= vm.dictEntryCount {
+		fmt.Println("Invalid dictionary entry index:", entryIndex)
+		return
+	}
+
+	dictEntryLocation := vm.dictEntryStart + uint16(entryIndex)*uint16(vm.dictEntryLength)
+	dictEntry := vm.Memory[dictEntryLocation : dictEntryLocation+uint16(vm.dictEntryLength)]
+	zText := dictEntry[0:vm.encodedTextLength]
+	textData := dictEntry[vm.encodedTextLength:]
+	fmt.Printf("Z-Text: %X\n", zText)
+	fmt.Printf("Data: %v\n", textData)
 }

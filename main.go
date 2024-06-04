@@ -42,6 +42,21 @@ func main() {
 				}
 				fmt.Printf("ASCII Character: '%c'\n", charCode)
 
+			case "dict":
+				if parameters == "" {
+					vm.PrintDictionary()
+					break
+				}
+
+				var entryIndex uint16
+				_, err := fmt.Sscanf(parameters, "%d", &entryIndex)
+				if err != nil {
+					fmt.Println("Invalid dictionary entry index:", parameters)
+					fmt.Println("Usage: dict <optional entry index>")
+					break
+				}
+				vm.PrintDictionaryEntry(entryIndex)
+
 			case "header":
 				vm.PrintHeader()
 
