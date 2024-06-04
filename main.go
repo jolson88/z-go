@@ -31,7 +31,10 @@ func main() {
 			switch command {
 
 			case "header":
-				fmt.Printf("Story header: %s\n", vm.PrintHeader())
+				vm.PrintHeader()
+
+			case "mem":
+				vm.PrintMemory(0, 8)
 
 			default:
 				fmt.Println("Unknown command:", command, commandInput)
