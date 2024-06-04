@@ -10,7 +10,7 @@ const KILOBYTES = 1024
 
 type VirtualMachine struct {
 	initialized bool
-	Memory      [512 * 1024]byte
+	Memory      [512 * KILOBYTES]byte // The maximum size of any z-machine file
 }
 
 func NewVirtualMachine(pathToStoryFile string) *VirtualMachine {
@@ -43,15 +43,18 @@ func (vm *VirtualMachine) PrintMemory(startAddress uint16, lines uint16) {
 
 	fmt.Println("        00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F")
 	for i := alignedStart; i < alignedEnd; i += BYTES_PER_LINE {
-		var offset uint16 = 0
-		fmt.Printf("0x%04X: ", i+offset)
-		for offset < BYTES_PER_LINE {
-			fmt.Printf("%02X ", vm.Memory[i+offset])
-			offset += 1
+		var offset, cellAddress uint16
+		fmt.Printf("0x%04X: ", i)
+		for offset = 0; offset < BYTES_PER_LINE; offset += 1 {
+			cellAddress = i + offset
+			if cellAddress == startAddress {
+				fmt.Printf("\033[32m%02X\033[0m ", vm.Memory[cellAddress])
+			} else {
+				fmt.Printf("%02X ", vm.Memory[cellAddress])
+			}
 		}
-		fmt.Println("")
+		fmt.Printf("\n")
 	}
-	fmt.Println("")
 }
 
 func (vm *VirtualMachine) readWord(address uint16) uint16 {
