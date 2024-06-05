@@ -151,6 +151,12 @@ func (vm *ZmVm) PrintHeader() {
 /*
 Text
 */
+var defaultAlphabets = [3]string{
+	"abcdefghijklmnopqrstuvwxyz",    // A0
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ",    // A1
+	" \n0123456789.,!?_#'\"/\\-:()", // A2
+}
+
 func ParseText(word uint16) *ZmText {
 	return &ZmText{
 		IsLastWord: word&0x8000 != 0,
@@ -160,6 +166,15 @@ func ParseText(word uint16) *ZmText {
 			ZmChar(word & 0x1F),
 		},
 	}
+}
+
+func zmCharToZscii(alphabet byte, char ZmChar) byte {
+	if char < 6 || char > 31 || alphabet >= 3 {
+		return 0
+	}
+
+	charIndex := char - 6
+	return defaultAlphabets[alphabet][charIndex]
 }
 
 /*
