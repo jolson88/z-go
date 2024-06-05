@@ -157,7 +157,7 @@ var defaultAlphabets = [3]string{
 	" \n0123456789.,!?_#'\"/\\-:()", // A2
 }
 
-func ParseText(word uint16) *ZmText {
+func parseText(word uint16) *ZmText {
 	return &ZmText{
 		IsLastWord: word&0x8000 != 0,
 		Chars: [3]ZmChar{
@@ -174,6 +174,19 @@ func zmCharToZscii(alphabet byte, char ZmChar) byte {
 	}
 
 	return defaultAlphabets[alphabet][char-6]
+}
+
+func zmTextToString(text []*ZmText) string {
+	result := ""
+	for _, word := range text {
+		for i := 0; i < 3; i++ {
+			result += string(zmCharToZscii(0, word.Chars[i]))
+		}
+		if word.IsLastWord {
+			break
+		}
+	}
+	return result
 }
 
 /*
@@ -211,11 +224,14 @@ func (vm *ZmVm) PrintDictionaryEntry(entryIndex uint16) {
 	dictEntry := vm.dictionaryEntry(entryIndex)
 	fmt.Println("Text:")
 	for _, text := range dictEntry.Text {
-		zmText := ParseText(uint16(text))
-		fmt.Printf("    - [0x%x 0x%x 0x%x] (isLast? %v)\n",
+		zmText := parseText(uint16(text))
+		fmt.Printf("    - [0x%X 0x%X 0x%X] '%c%c%c' (isLast? %v)\n",
 			zmText.Chars[0],
 			zmText.Chars[1],
 			zmText.Chars[2],
+			zmCharToZscii(0, zmText.Chars[0]),
+			zmCharToZscii(0, zmText.Chars[1]),
+			zmCharToZscii(0, zmText.Chars[2]),
 			zmText.IsLastWord)
 	}
 	fmt.Printf("Data: %v\n", dictEntry.Data)
