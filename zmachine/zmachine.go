@@ -173,8 +173,7 @@ func zmCharToZscii(alphabet byte, char ZmChar) byte {
 		return 0
 	}
 
-	charIndex := char - 6
-	return defaultAlphabets[alphabet][charIndex]
+	return defaultAlphabets[alphabet][char-6]
 }
 
 /*
