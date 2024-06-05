@@ -6,11 +6,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jolson88/z-go/vm"
+	"github.com/jolson88/z-go/zmachine"
 )
 
 func main() {
-	vm := vm.NewVirtualMachine("rom/zork2-r63-s860811.z3")
+	vm := zmachine.NewVirtualMachine("rom/zork2-r63-s860811.z3")
 	scanner := bufio.NewScanner(os.Stdin)
 
 	fmt.Println("\nWelcome to z-go! Type 'exit' to quit.")

@@ -1,4 +1,4 @@
-package vm
+package zmachine
 
 import (
 	"fmt"
@@ -8,20 +8,27 @@ import (
 
 const KILOBYTES = 1024
 
-type VirtualMachine struct {
+type ZmWord uint16
+type ZmChar byte
+type ZmText struct {
+	IsLastWord bool
+	Chars      [3]ZmChar
+}
+
+type ZmVm struct {
 	initialized bool
 	Memory      [512 * KILOBYTES]byte // The maximum size of any z-machine file
 
 	// Dictionary
 	dictEntryLength   byte
-	dictEntryCount    uint16
+	dictEntryCount    ZmWord
 	dictEntryStart    uint16
 	encodedTextLength byte
 	wordSeparators    []byte
 }
 
-func NewVirtualMachine(pathToStoryFile string) *VirtualMachine {
-	vm := &VirtualMachine{}
+func NewVirtualMachine(pathToStoryFile string) *ZmVm {
+	vm := &ZmVm{}
 
 	data, err := os.ReadFile(pathToStoryFile)
 	if err != nil {
@@ -33,12 +40,12 @@ func NewVirtualMachine(pathToStoryFile string) *VirtualMachine {
 	dictionaryAddress := vm.dictionaryLocation()
 	wordSeparatorCount := vm.Memory[dictionaryAddress]
 	for i := 0; i < int(wordSeparatorCount); i++ {
-		vm.wordSeparators = append(vm.wordSeparators, vm.Memory[dictionaryAddress+uint16(i)+1])
+		vm.wordSeparators = append(vm.wordSeparators, vm.Memory[dictionaryAddress+ZmWord(i)+1])
 	}
-	entryLengthLocation := dictionaryAddress + uint16(wordSeparatorCount) + 1
+	entryLengthLocation := dictionaryAddress + ZmWord(wordSeparatorCount) + 1
 	vm.dictEntryLength = vm.Memory[entryLengthLocation]
-	vm.dictEntryCount = vm.readWord(entryLengthLocation + 1)
-	vm.dictEntryStart = entryLengthLocation + 3
+	vm.dictEntryCount = vm.readWord(uint16(entryLengthLocation) + 1)
+	vm.dictEntryStart = uint16(entryLengthLocation) + 3
 	vm.encodedTextLength = 4
 
 	vm.initialized = true
@@ -48,7 +55,7 @@ func NewVirtualMachine(pathToStoryFile string) *VirtualMachine {
 /*
 Memory Read/Write
 */
-func (vm *VirtualMachine) PrintMemory(startAddress uint16, lines uint16) {
+func (vm *ZmVm) PrintMemory(startAddress uint16, lines uint16) {
 	if !vm.initialized {
 		fmt.Println("VM not initialized")
 		return
@@ -75,57 +82,57 @@ func (vm *VirtualMachine) PrintMemory(startAddress uint16, lines uint16) {
 	}
 }
 
-func (vm *VirtualMachine) readWord(address uint16) uint16 {
+func (vm *ZmVm) readWord(address uint16) ZmWord {
 	// Z-Machine is Big Endian. Need to swap around the bytes on Little Endian systems.
-	return uint16(vm.Memory[address])<<8 | uint16(vm.Memory[address+1])
+	return ZmWord(uint16(vm.Memory[address])<<8 | uint16(vm.Memory[address+1]))
 }
 
 /*
 Header Information
 */
-func (vm *VirtualMachine) StoryChecksum() uint16 {
+func (vm *ZmVm) StoryChecksum() ZmWord {
 	return vm.readWord(0x1C)
 }
 
-func (vm *VirtualMachine) StoryLength() uint32 {
+func (vm *ZmVm) StoryLength() uint32 {
 	// Up to v3, the story length this value multiplied by 2.
 	// See "packed addresses" in the specification for more information.
 	return uint32(vm.readWord(0x1A)) * 2
 }
 
-func (vm *VirtualMachine) StoryVersion() byte {
+func (vm *ZmVm) StoryVersion() byte {
 	return vm.Memory[0x00]
 }
 
-func (vm *VirtualMachine) highMemoryBase() uint16 {
+func (vm *ZmVm) highMemoryBase() ZmWord {
 	return vm.readWord(0x4)
 }
 
-func (vm *VirtualMachine) staticMemoryBase() uint16 {
+func (vm *ZmVm) staticMemoryBase() ZmWord {
 	return vm.readWord(0xE)
 }
 
-func (vm *VirtualMachine) initialProgramCounter() uint16 {
+func (vm *ZmVm) initialProgramCounter() ZmWord {
 	return vm.readWord(0x6)
 }
 
-func (vm *VirtualMachine) dictionaryLocation() uint16 {
+func (vm *ZmVm) dictionaryLocation() ZmWord {
 	return vm.readWord(0x8)
 }
 
-func (vm *VirtualMachine) objectsLocation() uint16 {
+func (vm *ZmVm) objectsLocation() ZmWord {
 	return vm.readWord(0xA)
 }
 
-func (vm *VirtualMachine) globalsLocation() uint16 {
+func (vm *ZmVm) globalsLocation() ZmWord {
 	return vm.readWord(0xC)
 }
 
-func (vm *VirtualMachine) abbreviationsLocation() uint16 {
+func (vm *ZmVm) abbreviationsLocation() ZmWord {
 	return vm.readWord(0x18)
 }
 
-func (vm *VirtualMachine) PrintHeader() {
+func (vm *ZmVm) PrintHeader() {
 	if !vm.initialized {
 		fmt.Println("VM not initialized")
 		return
@@ -142,9 +149,28 @@ func (vm *VirtualMachine) PrintHeader() {
 }
 
 /*
+Text
+*/
+func ParseText(word uint16) *ZmText {
+	return &ZmText{
+		IsLastWord: word&0x8000 != 0,
+		Chars: [3]ZmChar{
+			ZmChar(word >> 10 & 0x1F),
+			ZmChar(word >> 5 & 0x1F),
+			ZmChar(word & 0x1F),
+		},
+	}
+}
+
+/*
 Dictionary
 */
-func (vm *VirtualMachine) PrintDictionary() {
+type DictionaryEntry struct {
+	Text []ZmWord
+	Data []byte
+}
+
+func (vm *ZmVm) PrintDictionary() {
 	if !vm.initialized {
 		fmt.Println("VM not initialized")
 		return
@@ -158,20 +184,42 @@ func (vm *VirtualMachine) PrintDictionary() {
 	fmt.Printf("Entry Count: %d\n", vm.dictEntryCount)
 }
 
-func (vm *VirtualMachine) PrintDictionaryEntry(entryIndex uint16) {
+func (vm *ZmVm) PrintDictionaryEntry(entryIndex uint16) {
 	if !vm.initialized {
 		fmt.Println("VM not initialized")
 		return
 	}
-	if entryIndex >= vm.dictEntryCount {
+	if entryIndex >= uint16(vm.dictEntryCount) {
 		fmt.Println("Invalid dictionary entry index:", entryIndex)
 		return
 	}
 
-	dictEntryLocation := vm.dictEntryStart + uint16(entryIndex)*uint16(vm.dictEntryLength)
+	dictEntry := vm.dictionaryEntry(entryIndex)
+	fmt.Println("Text:")
+	for _, text := range dictEntry.Text {
+		zmText := ParseText(uint16(text))
+		fmt.Printf("    - [0x%x 0x%x 0x%x] (isLast? %v)\n",
+			zmText.Chars[0],
+			zmText.Chars[1],
+			zmText.Chars[2],
+			zmText.IsLastWord)
+	}
+	fmt.Printf("Data: %v\n", dictEntry.Data)
+}
+
+func (vm *ZmVm) dictionaryEntry(idx uint16) *DictionaryEntry {
+	dictEntryLocation := vm.dictEntryStart + uint16(idx)*uint16(vm.dictEntryLength)
 	dictEntry := vm.Memory[dictEntryLocation : dictEntryLocation+uint16(vm.dictEntryLength)]
-	zText := dictEntry[0:vm.encodedTextLength]
-	textData := dictEntry[vm.encodedTextLength:]
-	fmt.Printf("Z-Text: %X\n", zText)
-	fmt.Printf("Data: %v\n", textData)
+
+	textBytes := dictEntry[0:vm.encodedTextLength]
+	entryText := []ZmWord{}
+	for i := 0; i < len(textBytes); i += 2 {
+		word := uint16(textBytes[i])<<8 | uint16(textBytes[i+1])
+		entryText = append(entryText, ZmWord(word))
+	}
+
+	return &DictionaryEntry{
+		Text: entryText,
+		Data: dictEntry[vm.encodedTextLength:],
+	}
 }
