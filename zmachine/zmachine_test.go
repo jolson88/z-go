@@ -34,3 +34,19 @@ func TestZmTextToString(t *testing.T) {
 		t.Errorf("Expected 'sailor', got '%s'", result)
 	}
 }
+
+func TestZmTextToStringShifting(t *testing.T) {
+	result := zmTextToString([]*ZmText{
+		{
+			Chars:      [3]ZmChar{0x4, 0x6, 0x5},
+			IsLastWord: false,
+		},
+		{
+			Chars:      [3]ZmChar{0x11, 0x5, 0x5},
+			IsLastWord: true,
+		},
+	})
+	if result != "A9" {
+		t.Errorf("Expected 'A9', got '%s'", result)
+	}
+}
